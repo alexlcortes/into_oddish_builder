@@ -7,3 +7,50 @@
 body {
   font-family: system-ui, sans-serif;
 }
+
+#ability-scores-list {
+  list-style: none;
+}
+
+#ability-scores-list li {
+  display: grid;
+  grid-template-columns: 90px 30px 1fr;
+  gap: 8px;
+  align-items: baseline;
+  padding: 4px 0;
+}
+
+.ability-score-value {
+  font-weight: bold;
+  display: block;
+  width: 100%;
+  text-align: center;
+}
+
+.ability-score-highest {
+  border: 2px solid black;
+}
+
+.ability-score-description {
+  font-size: 12px;
+}
+
+#main-attribute-prompt {
+  margin-top: 12px;
+}
+
+#main-attribute-choices {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+#reroll-prompt {
+  margin-top: 12px;
+}
+
+#reroll-choices {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
