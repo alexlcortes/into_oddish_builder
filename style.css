@@ -54,3 +54,17 @@ body {
   gap: 8px;
   margin-top: 6px;
 }
+
+#starting-moves-list {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+#starting-moves-list li {
+  border: 2px solid black;
+  border-radius: 6px;
+  padding: 4px 10px;
+}

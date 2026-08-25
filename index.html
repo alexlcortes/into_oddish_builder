@@ -19,7 +19,6 @@
         <li><span class="ability-score-name">Strength:</span> <span id="ability-score-strength" class="ability-score-value"></span> <em class="ability-score-description">Fighting, fortitude, and toughness.</em></li>
         <li><span class="ability-score-name">Dexterity:</span> <span id="ability-score-dexterity" class="ability-score-value"></span> <em class="ability-score-description">Stealth, athletics, and reflexes.</em></li>
         <li><span class="ability-score-name">Willpower:</span> <span id="ability-score-willpower" class="ability-score-value"></span> <em class="ability-score-description">Confidence, discipline, and charisma.</em></li>
-        <li id="hitpoints-row" hidden><span class="ability-score-name">Hit Points:</span> <span id="ability-score-hitpoints" class="ability-score-value"></span></li>
         <li><span class="ability-score-name">Pokedollars:</span> <span id="ability-score-pokedollars" class="ability-score-value"></span></li>
       </ul>
 
@@ -35,6 +34,15 @@
 
       <div id="pokemon-result" hidden>
         <p>Starter Pokemon: <strong><span id="pokemon-name"></span></strong></p>
+
+        <div id="starting-stats" hidden>
+          <p>Hit Points: <strong><span id="starting-hp"></span></strong></p>
+          <p>Armor: <strong><span id="starting-armor"></span></strong></p>
+          <p>Starting Moves:</p>
+          <ul id="starting-moves-list"></ul>
+        </div>
+
+        <p id="starting-stats-missing" hidden>Starting stats for this Pokemon haven't been configured yet.</p>
       </div>
     </section>
   </main>
