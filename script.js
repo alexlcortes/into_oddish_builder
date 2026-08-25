@@ -20,6 +20,8 @@ const startingHpElement = document.getElementById("starting-hp");
 const startingArmorElement = document.getElementById("starting-armor");
 const startingMovesList = document.getElementById("starting-moves-list");
 const startingStatsMissingElement = document.getElementById("starting-stats-missing");
+const pokemonArtElement = document.getElementById("pokemon-art");
+const savingThrowResultElement = document.getElementById("saving-throw-result");
 
 const abilityScoreLabels = {
   strength: "Strength",
@@ -230,18 +232,27 @@ const pokemonStartingData = {
 
 let currentAbilityScores = null;
 
+// Rolls a single six-sided die (1-6).
 function rollDie() {
   return Math.floor(Math.random() * 6) + 1;
 }
 
+// Rolls two six-sided dice and sums them (2-12) — used for ability scores.
 function roll2d6() {
   return rollDie() + rollDie();
 }
 
+// Rolls a single six-sided die — used for starting Pokedollars.
 function roll1d6() {
   return rollDie();
 }
 
+// Rolls a single twenty-sided die — used for ability score saving throws.
+function roll1d20() {
+  return rollDice(1, 20);
+}
+
+// Rolls `count` dice with `sides` faces each and returns the total.
 function rollDice(count, sides) {
   let total = 0;
   for (let i = 0; i < count; i++) {
@@ -250,11 +261,14 @@ function rollDice(count, sides) {
   return total;
 }
 
+// Parses a "NdM" string (e.g. "1d8") and rolls it via rollDice.
 function rollFromDiceNotation(diceNotation) {
   const [count, sides] = diceNotation.split("d").map(Number);
   return rollDice(count, sides);
 }
 
+// Finds the pokedollarBonus entry whose min/max range contains the rolled
+// Pokedollar amount, or null if the amount falls outside all ranges.
 function getPokedollarBonus(pokemonStartData, pokedollars) {
   const match = pokemonStartData.pokedollarBonus.find(
     ({ min, max }) => pokedollars >= min && pokedollars <= max
@@ -262,6 +276,7 @@ function getPokedollarBonus(pokemonStartData, pokedollars) {
   return match || null;
 }
 
+// Buckets a raw 2-12 ability score into the range keys used by pokemonTable.
 function getScoreRange(score) {
   if (score <= 7) return "2-7";
   if (score === 8) return "8";
@@ -270,11 +285,23 @@ function getScoreRange(score) {
   if (score === 12) return "12";
 }
 
+// Looks up which Pokemon corresponds to a main ability + its score.
 function getPokemon(mainAbility, score) {
   const range = getScoreRange(score);
   return pokemonTable[mainAbility][range];
 }
 
+// Converts a Pokemon name into its image filename, e.g. "Nidoran (F)" ->
+// "nidoran-f". Images live flat under /images, named by this slug.
+function slugifyPokemonName(pokemon) {
+  return pokemon
+    .toLowerCase()
+    .replace(/[()]/g, "")
+    .replace(/\s+/g, "-");
+}
+
+// Resolves and renders the Pokemon for the chosen main ability, then shows
+// its starting stats.
 function displayPokemon(mainAbility) {
   const score = currentAbilityScores[mainAbility];
   const pokemon = getPokemon(mainAbility, score);
@@ -283,6 +310,9 @@ function displayPokemon(mainAbility) {
   displayStartingStats(pokemon);
 }
 
+// Rolls HP and renders a Pokemon's starting HP, armor, base moves, and
+// Pokedollar-tier bonus move/item. Falls back to a "missing data" notice
+// for any Pokemon not yet filled in in pokemonStartingData.
 function displayStartingStats(pokemon) {
   const startData = pokemonStartingData[pokemon];
 
@@ -314,15 +344,44 @@ function displayStartingStats(pokemon) {
     startingMovesList.appendChild(listItem);
   }
 
+  // Hide the art until we know the image actually exists — not every
+  // Pokemon has one yet.
+  pokemonArtElement.hidden = true;
+  pokemonArtElement.onerror = () => {
+    pokemonArtElement.hidden = true;
+  };
+  pokemonArtElement.onload = () => {
+    pokemonArtElement.hidden = false;
+  };
+  pokemonArtElement.alt = pokemon;
+  pokemonArtElement.src = `images/${slugifyPokemonName(pokemon)}.png`;
+
+  savingThrowResultElement.textContent = "";
+
   startingStatsDiv.hidden = false;
 }
 
+// Rolls a 1d20 saving throw against an ability score. Success is rolling
+// at or under the score, matching the tabletop convention this builder
+// follows for ability checks.
+function performSavingThrow(abilityScoreName) {
+  const score = currentAbilityScores[abilityScoreName];
+  const roll = roll1d20();
+  const success = roll <= score;
+  const label = abilityScoreLabels[abilityScoreName];
+  savingThrowResultElement.textContent = `Your ${label} (${roll}) save was a ${success ? "success" : "failure"}!`;
+}
+
+// Writes the current ability score values into their DOM elements.
 function renderAbilityScores() {
   for (const [abilityScoreName, value] of Object.entries(currentAbilityScores)) {
     abilityScoreElements[abilityScoreName].textContent = value;
   }
 }
 
+// Handles the user's manual pick when multiple ability scores were tied for
+// highest: marks it highlighted, hides the tie-breaker prompt, and reveals
+// the resulting Pokemon.
 function highlightMainAttribute(abilityScoreName) {
   for (const element of Object.values(abilityScoreElements)) {
     element.classList.remove("ability-score-highest");
@@ -332,6 +391,8 @@ function highlightMainAttribute(abilityScoreName) {
   displayPokemon(abilityScoreName);
 }
 
+// Renders one choice button per tied ability score so the user can break
+// the tie for main attribute.
 function promptForMainAttribute(tiedAbilityScoreNames) {
   mainAttributeChoices.innerHTML = "";
 
@@ -345,6 +406,9 @@ function promptForMainAttribute(tiedAbilityScoreNames) {
   mainAttributePrompt.hidden = false;
 }
 
+// Determines the main attribute from the highest ability score. If there's
+// a single highest score it's chosen automatically; if scores are tied, the
+// user is prompted to pick one.
 function chooseMainAttribute() {
   const highestScore = Math.max(...Object.values(currentAbilityScores));
   const tiedAbilityScoreNames = Object.entries(currentAbilityScores)
@@ -364,6 +428,8 @@ function chooseMainAttribute() {
   }
 }
 
+// Re-rolls one ability score in place, re-renders scores, and proceeds to
+// choosing the main attribute.
 function rerollAbilityScore(abilityScoreName) {
   currentAbilityScores[abilityScoreName] = roll2d6();
   renderAbilityScores();
@@ -371,11 +437,14 @@ function rerollAbilityScore(abilityScoreName) {
   chooseMainAttribute();
 }
 
+// User declined to reroll: proceed straight to choosing the main attribute.
 function keepAllAbilityScores() {
   rerollPrompt.hidden = true;
   chooseMainAttribute();
 }
 
+// Offers a reroll for each ability score tied for lowest, plus a "keep all"
+// option, before the main attribute is chosen.
 function promptForReroll() {
   const lowestScore = Math.min(...Object.values(currentAbilityScores));
   const tiedLowestAbilityScoreNames = Object.entries(currentAbilityScores)
@@ -400,6 +469,9 @@ function promptForReroll() {
   rerollPrompt.hidden = false;
 }
 
+// Entry point for the "Create Character" button: rolls fresh ability
+// scores and starting Pokedollars, resets prior selections/UI state, and
+// kicks off the reroll prompt.
 function createNewCharacter() {
   currentAbilityScores = {
     strength: roll2d6(),
@@ -415,8 +487,23 @@ function createNewCharacter() {
     element.classList.remove("ability-score-highest");
   }
 
+  // Clear any previously rolled Pokemon so it doesn't linger on screen
+  // while the new character goes through reroll/main-attribute selection.
+  pokemonResultDiv.hidden = true;
+  pokemonNameElement.textContent = "";
+  startingStatsDiv.hidden = true;
+  startingStatsMissingElement.hidden = true;
+  startingMovesList.innerHTML = "";
+  pokemonArtElement.hidden = true;
+  pokemonArtElement.src = "";
+  savingThrowResultElement.textContent = "";
+
   abilityScoresPanel.hidden = false;
   promptForReroll();
 }
 
 createCharacterBtn.addEventListener("click", createNewCharacter);
+
+for (const [abilityScoreName, element] of Object.entries(abilityScoreElements)) {
+  element.addEventListener("click", () => performSavingThrow(abilityScoreName));
+}

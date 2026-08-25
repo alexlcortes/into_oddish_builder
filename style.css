@@ -6,6 +6,9 @@
 
 body {
   font-family: system-ui, sans-serif;
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 20px;
 }
 
 #ability-scores-list {
@@ -25,6 +28,14 @@ body {
   display: block;
   width: 100%;
   text-align: center;
+}
+
+.ability-score-saveable {
+  cursor: pointer;
+}
+
+.ability-score-saveable:hover {
+  background: #eee;
 }
 
 .ability-score-highest {
@@ -67,4 +78,27 @@ body {
   border: 2px solid black;
   border-radius: 6px;
   padding: 4px 10px;
+}
+
+#pokemon-result {
+  border: 2px solid black;
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-top: 12px;
+}
+
+#pokemon-display {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+#pokemon-art {
+  display: block;
+  max-width: 200px;
+}
+
+#saving-throw-result {
+  font-style: italic;
 }
