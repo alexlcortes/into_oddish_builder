@@ -19,10 +19,21 @@ A vanilla HTML/CSS/JavaScript web app for generating Pokemon character starter s
 
 5. **Pokedollars**: You also receive 1d6 Pokedollars as starting currency.
 
+6. **Starting Pokemon Stats**: After your starter is determined, the app displays its starting kit:
+  - **Hit Points**: Rolled from that Pokemon's configured hit point die and shown as current/max HP.
+  - **Armor**: The Pokemon's configured starting armor value.
+  - **Starting Moves**: The Pokemon's guaranteed base moves, plus one bonus move or consumable item based on the Pokedollars result.
+
+  Bonus results use these Pokedollar ranges:
+  - **1**: First configured bonus move or item
+  - **2-3**: Second configured bonus move or item
+  - **4-5**: Consumable item
+  - **6**: Consumable item
+
 ## File Structure
 
 - `index.html` - Main markup and page layout
-- `script.js` - Character creation logic, dice rolling, Pokemon lookup
+- `script.js` - Character creation logic, dice rolling, Pokemon lookup, and Pokemon starting data
 - `style.css` - Styling and layout (Grid-based ability score display)
 - `images/` - Image assets (if any)
 
