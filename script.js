@@ -15,6 +15,7 @@ const abilityScoreElements = {
 const pokedollarsElement = document.getElementById("ability-score-pokedollars");
 const pokemonResultDiv = document.getElementById("pokemon-result");
 const pokemonNameElement = document.getElementById("pokemon-name");
+const pokemonTypesElement = document.getElementById("pokemon-types");
 const startingStatsDiv = document.getElementById("starting-stats");
 const startingHpElement = document.getElementById("starting-hp");
 const startingArmorElement = document.getElementById("starting-armor");
@@ -62,6 +63,7 @@ const pokemonTable = {
 const pokemonStartingData = {
   // Strength
   Poliwag: {
+    types: ["Water"],
     hpDice: "1d8",
     armor: 0,
     baseMoves: ["Bubble"],
@@ -73,6 +75,7 @@ const pokemonStartingData = {
     ],
   },
   Geodude: {
+    types: ["Rock", "Ground"],
     hpDice: "1d6",
     armor: 2,
     baseMoves: ["Tackle"],
@@ -84,6 +87,7 @@ const pokemonStartingData = {
     ],
   },
   Machop: {
+    types: ["Fighting"],
     hpDice: "1d8",
     armor: 0,
     baseMoves: ["Karate Chop"],
@@ -95,6 +99,7 @@ const pokemonStartingData = {
     ],
   },
   Squirtle: {
+    types: ["Water"],
     hpDice: "1d6",
     armor: 1,
     baseMoves: ["Tackle", "Tail Whip"],
@@ -106,6 +111,7 @@ const pokemonStartingData = {
     ],
   },
   Dratini: {
+    types: ["Dragon"],
     hpDice: "1d4",
     armor: 0,
     baseMoves: ["Wrap", "Leer"],
@@ -118,6 +124,7 @@ const pokemonStartingData = {
   },
   // Dexterity
   Weedle: {
+    types: ["Bug", "Poison"],
     hpDice: "1d6",
     armor: 0,
     baseMoves: ["Poison Sting", "String Shot"],
@@ -129,6 +136,7 @@ const pokemonStartingData = {
     ],
   },
   "Nidoran (F)": {
+    types: ["Poison"],
     hpDice: "1d8",
     armor: 0,
     baseMoves: ["Tackle", "Leer"],
@@ -140,6 +148,7 @@ const pokemonStartingData = {
     ],
   },
   Pidgey: {
+    types: ["Normal", "Flying"],
     hpDice: "1d8",
     armor: 0,
     baseMoves: ["Gust", "Sand-Attack"],
@@ -151,6 +160,7 @@ const pokemonStartingData = {
     ],
   },
   Charmander: {
+    types: ["Fire"],
     hpDice: "1d6",
     armor: 0,
     baseMoves: ["Scratch", "Growl"],
@@ -162,6 +172,7 @@ const pokemonStartingData = {
     ],
   },
   Abra: {
+    types: ["Psychic"],
     hpDice: "1d4",
     armor: 0,
     baseMoves: ["Teleport"],
@@ -174,6 +185,7 @@ const pokemonStartingData = {
   },
   // Willpower
   Caterpie: {
+    types: ["Bug"],
     hpDice: "1d8",
     armor: 0,
     baseMoves: ["Tackle", "String Shot"],
@@ -185,6 +197,7 @@ const pokemonStartingData = {
     ],
   },
   "Nidoran (M)": {
+    types: ["Poison"],
     hpDice: "1d8",
     armor: 0,
     baseMoves: ["Tackle", "Growl"],
@@ -196,6 +209,7 @@ const pokemonStartingData = {
     ],
   },
   Oddish: {
+    types: ["Grass", "Poison"],
     hpDice: "1d6",
     armor: 0,
     baseMoves: ["Absorb"],
@@ -207,6 +221,7 @@ const pokemonStartingData = {
     ],
   },
   Bulbasaur: {
+    types: ["Grass", "Poison"],
     hpDice: "1d6",
     armor: 0,
     baseMoves: ["Tackle", "Growl"],
@@ -218,6 +233,7 @@ const pokemonStartingData = {
     ],
   },
   Gastly: {
+    types: ["Ghost", "Poison"],
     hpDice: "1d4",
     armor: 0,
     baseMoves: ["Lick", "Confuse Ray"],
@@ -231,6 +247,9 @@ const pokemonStartingData = {
 };
 
 let currentAbilityScores = null;
+let currentPokemonHp = null;
+let currentPokemonMaxHp = null;
+let consumedMoveNames = new Set();
 
 // Rolls a single six-sided die (1-6).
 function rollDie() {
@@ -323,24 +342,48 @@ function displayStartingStats(pokemon) {
   }
 
   startingStatsMissingElement.hidden = true;
+  pokemonTypesElement.innerHTML = "";
+  for (const type of startData.types) {
+    const typeElement = document.createElement("span");
+    typeElement.classList.add("type-tag", `pokemon-type-${type.toLowerCase()}`);
+    typeElement.textContent = type;
+    pokemonTypesElement.appendChild(typeElement);
+  }
 
   const pokedollars = Number(pokedollarsElement.textContent);
   const hp = rollFromDiceNotation(startData.hpDice);
   const bonus = getPokedollarBonus(startData, pokedollars);
 
+  currentPokemonHp = hp;
+  currentPokemonMaxHp = hp;
   startingHpElement.textContent = `${hp}/${hp}`;
   startingArmorElement.textContent = startData.armor ?? 0;
 
+  consumedMoveNames.clear();
   startingMovesList.innerHTML = "";
   for (const move of startData.baseMoves) {
     const listItem = document.createElement("li");
-    listItem.textContent = move;
+    const moveButton = document.createElement("button");
+    moveButton.type = "button";
+    moveButton.textContent = move;
+    moveButton.classList.add("starting-move-button");
+    moveButton.addEventListener("click", () => useMove(move));
+    listItem.appendChild(moveButton);
     startingMovesList.appendChild(listItem);
   }
 
   if (bonus) {
     const listItem = document.createElement("li");
-    listItem.textContent = bonus.consumable ? `${bonus.name} (Consumable Item)` : bonus.name;
+    const moveButton = document.createElement("button");
+    moveButton.type = "button";
+    moveButton.textContent = bonus.consumable ? `${bonus.name} (Consumable Item)` : bonus.name;
+    moveButton.classList.add("starting-move-button");
+    if (bonus.consumable && consumedMoveNames.has(bonus.name)) {
+      moveButton.disabled = true;
+      moveButton.classList.add("starting-move-button-used");
+    }
+    moveButton.addEventListener("click", () => useMove(bonus.name));
+    listItem.appendChild(moveButton);
     startingMovesList.appendChild(listItem);
   }
 
@@ -361,6 +404,86 @@ function displayStartingStats(pokemon) {
   startingStatsDiv.hidden = false;
 }
 
+// Uses a basic move.
+// Absorb deals a 1d4 hit and restores the same amount of HP, capped at the
+// user's maximum HP. Tackle is a fixed 4-damage Normal-type move. Potion is a
+// one-time consumable that heals 2d4 HP without a type.
+function useMove(moveName) {
+  const moveButtons = startingMovesList.querySelectorAll("button");
+  const matchingButton = [...moveButtons].find((button) => button.textContent.startsWith(moveName));
+
+  if (matchingButton && matchingButton.disabled) {
+    return;
+  }
+
+  if (moveName === "Absorb") {
+    const damageDealt = rollDice(1, 4);
+    const healAmount = Math.min(damageDealt, currentPokemonMaxHp - currentPokemonHp);
+    currentPokemonHp = Math.min(currentPokemonMaxHp, currentPokemonHp + healAmount);
+    startingHpElement.textContent = `${currentPokemonHp}/${currentPokemonMaxHp}`;
+
+    savingThrowResultElement.innerHTML = `You use <strong>${moveName.toUpperCase()}</strong>. <span class="type-tag pokemon-type-grass">Grass</span> type move. You deal ${damageDealt} HP and heal ${healAmount} HP.`;
+    return;
+  }
+
+  if (moveName === "Tackle") {
+    const damageDealt = 4;
+    savingThrowResultElement.innerHTML = `You use <strong>${moveName.toUpperCase()}</strong>. <span class="type-tag pokemon-type-normal">Normal</span> type move. You deal ${damageDealt} HP.`;
+    return;
+  }
+
+  if (moveName === "Potion") {
+    const healAmount = Math.min(rollDice(2, 4), currentPokemonMaxHp - currentPokemonHp);
+    currentPokemonHp = Math.min(currentPokemonMaxHp, currentPokemonHp + healAmount);
+    startingHpElement.textContent = `${currentPokemonHp}/${currentPokemonMaxHp}`;
+
+    consumedMoveNames.add(moveName);
+    if (matchingButton) {
+      matchingButton.disabled = true;
+      matchingButton.classList.add("starting-move-button-used");
+    }
+
+    savingThrowResultElement.innerHTML = `You use <strong>${moveName.toUpperCase()}</strong>. It heals ${healAmount} HP.`;
+    return;
+  }
+
+  if (moveName === "Antidote") {
+    consumedMoveNames.add(moveName);
+    if (matchingButton) {
+      matchingButton.disabled = true;
+      matchingButton.classList.add("starting-move-button-used");
+    }
+
+    savingThrowResultElement.innerHTML = `You use <strong>${moveName.toUpperCase()}</strong>. You have cleared your <strong>POISON</strong> status.`;
+    return;
+  }
+
+  if (moveName === "Repel") {
+    consumedMoveNames.add(moveName);
+    if (matchingButton) {
+      matchingButton.disabled = true;
+      matchingButton.classList.add("starting-move-button-used");
+    }
+
+    savingThrowResultElement.innerHTML = `You use <strong>${moveName.toUpperCase()}</strong>. Enemy Pokémon have disadvantage on morale saves for one day.`;
+    return;
+  }
+
+  if (moveName === "Strength") {
+    const damageDealt = rollDice(1, 8);
+    consumedMoveNames.add(moveName);
+    if (matchingButton) {
+      matchingButton.disabled = true;
+      matchingButton.classList.add("starting-move-button-used");
+    }
+
+    savingThrowResultElement.innerHTML = `You use <strong>${moveName.toUpperCase()}</strong>. <span class="type-tag pokemon-type-normal">Normal</span> type move. You deal ${damageDealt} HP to the target. It can also move travel-blocking boulders.`;
+    return;
+  }
+
+  savingThrowResultElement.innerHTML = `You use <strong>${moveName.toUpperCase()}</strong>.`;
+}
+
 // Rolls a 1d20 saving throw against an ability score. Success is rolling
 // at or under the score, matching the tabletop convention this builder
 // follows for ability checks.
@@ -369,7 +492,7 @@ function performSavingThrow(abilityScoreName) {
   const roll = roll1d20();
   const success = roll <= score;
   const label = abilityScoreLabels[abilityScoreName];
-  savingThrowResultElement.textContent = `Your ${label} (${roll}) save was a ${success ? "success" : "failure"}!`;
+  savingThrowResultElement.textContent = `You scored a (${roll}) on your ${label} save.  You ${success ? "succeeded!!!" : "failed..."}`;
 }
 
 // Writes the current ability score values into their DOM elements.
@@ -489,8 +612,10 @@ function createNewCharacter() {
 
   // Clear any previously rolled Pokemon so it doesn't linger on screen
   // while the new character goes through reroll/main-attribute selection.
+  consumedMoveNames.clear();
   pokemonResultDiv.hidden = true;
   pokemonNameElement.textContent = "";
+  pokemonTypesElement.innerHTML = "";
   startingStatsDiv.hidden = true;
   startingStatsMissingElement.hidden = true;
   startingMovesList.innerHTML = "";

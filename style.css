@@ -80,11 +80,112 @@ body {
   padding: 4px 10px;
 }
 
+.starting-move-button {
+  background: transparent;
+  border: none;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+.starting-move-button-used {
+  color: #888;
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 #pokemon-result {
   border: 2px solid black;
   border-radius: 6px;
   padding: 10px 12px;
   margin-top: 12px;
+}
+
+#pokemon-name {
+  font-size: 1.2em;
+}
+
+#pokemon-types {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6.4px;
+}
+
+.type-tag,
+#pokemon-types span {
+  display: inline-block;
+  border-radius: 4.8px;
+  padding: 3.2px 8px;
+  font-size: 0.8rem;
+  line-height: 1.2;
+  font-weight: 600;
+}
+
+.pokemon-type-water {
+  border: 0;
+  background-color: #2475c4;
+  color: white;
+}
+
+.pokemon-type-rock,
+.pokemon-type-ground,
+.pokemon-type-fighting,
+.pokemon-type-dragon,
+.pokemon-type-bug,
+.pokemon-type-poison,
+.pokemon-type-normal,
+.pokemon-type-flying,
+.pokemon-type-fire,
+.pokemon-type-psychic,
+.pokemon-type-grass,
+.pokemon-type-ghost {
+  border: 0;
+  color: white;
+}
+
+.pokemon-type-rock {
+  background-color: #b0b0b0;
+}
+
+.pokemon-type-ground {
+  background-color: brown;
+}
+
+.pokemon-type-fighting {
+  background-color: darkorange;
+}
+
+.pokemon-type-dragon,
+.pokemon-type-flying {
+  background-color: #b48be0;
+}
+
+.pokemon-type-bug {
+  background-color: olive;
+}
+
+.pokemon-type-poison {
+  background-color: purple;
+}
+
+.pokemon-type-normal {
+  background-color: gray;
+}
+
+.pokemon-type-fire {
+  background-color: orange;
+}
+
+.pokemon-type-psychic {
+  background-color: pink;
+}
+
+.pokemon-type-grass {
+  background-color: #90c965;
+}
+
+.pokemon-type-ghost {
+  background-color: #4f2174;
 }
 
 #pokemon-display {
