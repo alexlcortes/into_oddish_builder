@@ -7,51 +7,56 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <div class="page-shell">
+    <main id="app">
+      <h1>Pokemon Character Builder</h1>
+      <button id="create-character-btn">Create New Character</button>
 
-  <h1>Pokemon Character Builder</h1>
+      <section id="ability-scores-panel" hidden>
+        <h2>Ability Scores</h2>
+        <ul id="ability-scores-list">
+          <li><span class="ability-score-name">Strength:</span> <span id="ability-score-strength" class="ability-score-value ability-score-saveable"></span> <em class="ability-score-description">Fighting, fortitude, and toughness.</em></li>
+          <li><span class="ability-score-name">Dexterity:</span> <span id="ability-score-dexterity" class="ability-score-value ability-score-saveable"></span> <em class="ability-score-description">Stealth, athletics, and reflexes.</em></li>
+          <li><span class="ability-score-name">Willpower:</span> <span id="ability-score-willpower" class="ability-score-value ability-score-saveable"></span> <em class="ability-score-description">Confidence, discipline, and charisma.</em></li>
+          <li><span class="ability-score-name">Pokedollars:</span> <span id="ability-score-pokedollars" class="ability-score-value"></span></li>
+        </ul>
 
-  <main id="app">
-    <button id="create-character-btn">Create New Character</button>
-
-    <section id="ability-scores-panel" hidden>
-      <h2>Ability Scores</h2>
-      <ul id="ability-scores-list">
-        <li><span class="ability-score-name">Strength:</span> <span id="ability-score-strength" class="ability-score-value ability-score-saveable"></span> <em class="ability-score-description">Fighting, fortitude, and toughness.</em></li>
-        <li><span class="ability-score-name">Dexterity:</span> <span id="ability-score-dexterity" class="ability-score-value ability-score-saveable"></span> <em class="ability-score-description">Stealth, athletics, and reflexes.</em></li>
-        <li><span class="ability-score-name">Willpower:</span> <span id="ability-score-willpower" class="ability-score-value ability-score-saveable"></span> <em class="ability-score-description">Confidence, discipline, and charisma.</em></li>
-        <li><span class="ability-score-name">Pokedollars:</span> <span id="ability-score-pokedollars" class="ability-score-value"></span></li>
-      </ul>
-
-      <div id="main-attribute-prompt" hidden>
-        <p>Multiple ability scores are tied for the highest. Choose your main attribute:</p>
-        <div id="main-attribute-choices"></div>
-      </div>
-
-      <div id="reroll-prompt" hidden>
-        <p id="reroll-prompt-text"></p>
-        <div id="reroll-choices"></div>
-      </div>
-
-      <div id="pokemon-result" hidden>
-        <p><strong><span id="pokemon-name"></span></strong></p>
-        <p><strong><span id="pokemon-types"></span></strong></p>
-
-        <div id="starting-stats" hidden>
-          <p>Hit Points: <strong><span id="starting-hp"></span></strong></p>
-          <p>Armor: <strong><span id="starting-armor"></span></strong></p>
-          <p>Starting Moves:</p>
-          <ul id="starting-moves-list"></ul>
-
-          <div id="pokemon-display">
-            <img id="pokemon-art" alt="" hidden>
-            <p id="saving-throw-result"></p>
-          </div>
+        <div id="main-attribute-prompt" hidden>
+          <p>Multiple ability scores are tied for the highest. Choose your main attribute:</p>
+          <div id="main-attribute-choices"></div>
         </div>
 
-        <p id="starting-stats-missing" hidden>Starting stats for this Pokemon haven't been configured yet.</p>
-      </div>
-    </section>
-  </main>
+        <div id="reroll-prompt" hidden>
+          <p id="reroll-prompt-text"></p>
+          <div id="reroll-choices"></div>
+        </div>
+
+        <div id="pokemon-result" hidden>
+          <p><strong><span id="pokemon-name"></span></strong></p>
+          <p><strong><span id="pokemon-types"></span></strong></p>
+
+          <div id="starting-stats" hidden>
+            <p>Hit Points: <strong><span id="starting-hp"></span></strong></p>
+            <p>Armor: <strong><span id="starting-armor"></span></strong></p>
+            <p>Starting Moves:</p>
+            <ul id="starting-moves-list"></ul>
+
+            <div id="pokemon-display">
+              <img id="pokemon-art" alt="" hidden>
+              <p id="saving-throw-result"></p>
+            </div>
+          </div>
+
+          <p id="starting-stats-missing" hidden>Starting stats for this Pokemon haven't been configured yet.</p>
+        </div>
+      </section>
+    </main>
+
+    <aside id="save-slots-panel" class="save-slots-panel" aria-label="Bench Pokémon slots">
+      <h2>Bench Pokémon</h2>
+      <div id="save-slots-list" class="save-slots-list"></div>
+    </aside>
+  </div>
 
   <script src="script.js"></script>
 </body>

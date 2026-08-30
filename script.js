@@ -23,12 +23,252 @@ const startingMovesList = document.getElementById("starting-moves-list");
 const startingStatsMissingElement = document.getElementById("starting-stats-missing");
 const pokemonArtElement = document.getElementById("pokemon-art");
 const savingThrowResultElement = document.getElementById("saving-throw-result");
+const saveSlotsList = document.getElementById("save-slots-list");
+
+const SAVE_KEY = "oddish-builder-saves";
+const saveSlots = loadSaveSlots();
+let selectedMainAbility = null;
 
 const abilityScoreLabels = {
   strength: "Strength",
   dexterity: "Dexterity",
   willpower: "Willpower",
 };
+
+function getDefaultSaveSlots() {
+  return [null, null, null];
+}
+
+function loadSaveSlots() {
+  try {
+    const rawValue = localStorage.getItem(SAVE_KEY);
+    if (!rawValue) {
+      return getDefaultSaveSlots();
+    }
+
+    const parsed = JSON.parse(rawValue);
+    if (!Array.isArray(parsed) || parsed.length !== 3) {
+      return getDefaultSaveSlots();
+    }
+
+    return parsed.map((slot) => (slot && typeof slot === "object" ? slot : null));
+  } catch (error) {
+    console.warn("Unable to load save slots:", error);
+    return getDefaultSaveSlots();
+  }
+}
+
+function persistSaveSlots() {
+  localStorage.setItem(SAVE_KEY, JSON.stringify(saveSlots));
+  renderSaveSlots();
+}
+
+function buildCharacterSnapshot() {
+  if (!currentAbilityScores || !selectedMainAbility) {
+    return null;
+  }
+
+  const selectedPokemon = pokemonNameElement.textContent || getPokemon(selectedMainAbility, currentAbilityScores[selectedMainAbility]);
+  const startData = pokemonStartingData[selectedPokemon];
+  const bonusMove = startData ? getPokedollarBonus(startData, Number(pokedollarsElement.textContent)) : null;
+
+  return {
+    pokemon: selectedPokemon,
+    mainAbility: selectedMainAbility,
+    abilityScores: {
+      ...currentAbilityScores,
+    },
+    pokedollars: Number(pokedollarsElement.textContent) || 0,
+    hp: {
+      current: Number(currentPokemonHp) || 0,
+      max: Number(currentPokemonMaxHp) || 0,
+    },
+    armor: Number(startingArmorElement.textContent) || 0,
+    baseMoves: startData ? [...startData.baseMoves] : [],
+    bonusMove: bonusMove ? bonusMove.name : null,
+    bonusMoveType: bonusMove ? (bonusMove.consumable ? "item" : "move") : null,
+    types: startData ? [...startData.types] : [],
+    imageSlug: slugifyPokemonName(selectedPokemon),
+    savedAt: new Date().toISOString(),
+  };
+}
+
+function renderSavedCharacter(slotData) {
+  if (!slotData) {
+    pokemonResultDiv.hidden = true;
+    startingStatsDiv.hidden = true;
+    startingStatsMissingElement.hidden = true;
+    return;
+  }
+
+  currentAbilityScores = { ...slotData.abilityScores };
+  selectedMainAbility = slotData.mainAbility || Object.keys(currentAbilityScores).sort((a, b) => currentAbilityScores[b] - currentAbilityScores[a])[0];
+
+  renderAbilityScores();
+  pokedollarsElement.textContent = slotData.pokedollars;
+  pokemonNameElement.textContent = slotData.pokemon;
+  pokemonResultDiv.hidden = false;
+
+  const savedTypes = slotData.types || [];
+  pokemonTypesElement.innerHTML = "";
+  for (const type of savedTypes) {
+    const typeElement = document.createElement("span");
+    typeElement.classList.add("type-tag", `pokemon-type-${type.toLowerCase()}`);
+    typeElement.textContent = type;
+    pokemonTypesElement.appendChild(typeElement);
+  }
+
+  currentPokemonHp = Number(slotData.hp.current) || 0;
+  currentPokemonMaxHp = Number(slotData.hp.max) || currentPokemonHp;
+  startingHpElement.textContent = `${currentPokemonHp}/${currentPokemonMaxHp}`;
+  startingArmorElement.textContent = slotData.armor ?? 0;
+
+  const typesList = slotData.types || [];
+  const startData = pokemonStartingData[slotData.pokemon];
+  consumedMoveNames.clear();
+  startingMovesList.innerHTML = "";
+
+  for (const move of startData ? startData.baseMoves : []) {
+    const listItem = document.createElement("li");
+    const moveButton = document.createElement("button");
+    moveButton.type = "button";
+    moveButton.textContent = move;
+    moveButton.classList.add("starting-move-button");
+    moveButton.addEventListener("click", () => useMove(move));
+    listItem.appendChild(moveButton);
+    startingMovesList.appendChild(listItem);
+  }
+
+  if (slotData.bonusMove) {
+    const listItem = document.createElement("li");
+    const moveButton = document.createElement("button");
+    moveButton.type = "button";
+    moveButton.textContent = slotData.bonusMoveType === "item" ? `${slotData.bonusMove} (Consumable Item)` : slotData.bonusMove;
+    moveButton.classList.add("starting-move-button");
+    moveButton.addEventListener("click", () => useMove(slotData.bonusMove));
+    listItem.appendChild(moveButton);
+    startingMovesList.appendChild(listItem);
+  }
+
+  for (const element of Object.values(abilityScoreElements)) {
+    element.classList.remove("ability-score-highest");
+  }
+  if (selectedMainAbility && abilityScoreElements[selectedMainAbility]) {
+    abilityScoreElements[selectedMainAbility].classList.add("ability-score-highest");
+  }
+
+  startingStatsDiv.hidden = false;
+  startingStatsMissingElement.hidden = true;
+  pokemonArtElement.hidden = true;
+  pokemonArtElement.onerror = () => {
+    pokemonArtElement.hidden = true;
+  };
+  pokemonArtElement.onload = () => {
+    pokemonArtElement.hidden = false;
+  };
+  pokemonArtElement.alt = slotData.pokemon;
+  pokemonArtElement.src = `images/${slotData.imageSlug || slugifyPokemonName(slotData.pokemon)}.png`;
+  savingThrowResultElement.textContent = "";
+}
+
+function saveCurrentCharacter(slotIndex) {
+  if (!currentAbilityScores || !selectedMainAbility) {
+    return;
+  }
+
+  const snapshot = buildCharacterSnapshot();
+  if (!snapshot) {
+    return;
+  }
+
+  if (saveSlots[slotIndex] && !window.confirm("Overwrite this saved Pokémon?")) {
+    return;
+  }
+
+  saveSlots[slotIndex] = snapshot;
+  persistSaveSlots();
+}
+
+function loadSavedCharacter(slotIndex) {
+  const slotData = saveSlots[slotIndex];
+  if (!slotData) {
+    return;
+  }
+
+  renderSavedCharacter(slotData);
+  renderSaveSlots();
+}
+
+function renderSaveSlots() {
+  saveSlotsList.innerHTML = "";
+
+  saveSlots.forEach((slot, index) => {
+    const card = document.createElement("div");
+    card.className = "save-slot-card";
+
+    const header = document.createElement("div");
+    header.className = "save-slot-header";
+
+    const title = document.createElement("h3");
+    title.textContent = `Slot ${index + 1}`;
+
+    header.appendChild(title);
+    card.appendChild(header);
+
+    const preview = document.createElement("div");
+    preview.className = "save-slot-preview";
+
+    if (slot) {
+      const art = document.createElement("img");
+      art.src = `images/${slot.imageSlug || slugifyPokemonName(slot.pokemon)}.png`;
+      art.alt = slot.pokemon;
+      art.onerror = () => {
+        art.hidden = true;
+      };
+      preview.appendChild(art);
+
+      const name = document.createElement("p");
+      name.className = "save-slot-name";
+      name.textContent = slot.pokemon;
+      preview.appendChild(name);
+    } else {
+      const emptyState = document.createElement("p");
+      emptyState.className = "save-slot-name";
+      emptyState.textContent = "Empty";
+      preview.appendChild(emptyState);
+    }
+
+    card.appendChild(preview);
+
+    if (slot) {
+      const summary = document.createElement("p");
+      summary.className = "save-slot-summary";
+      summary.textContent = `${slot.mainAbility ? abilityScoreLabels[slot.mainAbility] : "Main attribute"} · ${slot.abilityScores[slot.mainAbility] ?? ""}`;
+      card.appendChild(summary);
+    }
+
+    const actions = document.createElement("div");
+    actions.className = "save-slot-actions";
+
+    const saveButton = document.createElement("button");
+    saveButton.type = "button";
+    saveButton.className = "save-slot-button primary";
+    saveButton.textContent = slot ? "Save Over" : "Save";
+    saveButton.addEventListener("click", () => saveCurrentCharacter(index));
+    actions.appendChild(saveButton);
+
+    const loadButton = document.createElement("button");
+    loadButton.type = "button";
+    loadButton.className = "save-slot-button";
+    loadButton.textContent = slot ? "Load" : "Empty";
+    loadButton.disabled = !slot;
+    loadButton.addEventListener("click", () => loadSavedCharacter(index));
+    actions.appendChild(loadButton);
+
+    card.appendChild(actions);
+    saveSlotsList.appendChild(card);
+  });
+}
 
 // Pokemon table: indexed by main ability score, then by score range
 const pokemonTable = {
@@ -322,6 +562,7 @@ function slugifyPokemonName(pokemon) {
 // Resolves and renders the Pokemon for the chosen main ability, then shows
 // its starting stats.
 function displayPokemon(mainAbility) {
+  selectedMainAbility = mainAbility;
   const score = currentAbilityScores[mainAbility];
   const pokemon = getPokemon(mainAbility, score);
   pokemonNameElement.textContent = pokemon;
@@ -506,6 +747,7 @@ function renderAbilityScores() {
 // highest: marks it highlighted, hides the tie-breaker prompt, and reveals
 // the resulting Pokemon.
 function highlightMainAttribute(abilityScoreName) {
+  selectedMainAbility = abilityScoreName;
   for (const element of Object.values(abilityScoreElements)) {
     element.classList.remove("ability-score-highest");
   }
@@ -596,6 +838,7 @@ function promptForReroll() {
 // scores and starting Pokedollars, resets prior selections/UI state, and
 // kicks off the reroll prompt.
 function createNewCharacter() {
+  selectedMainAbility = null;
   currentAbilityScores = {
     strength: roll2d6(),
     dexterity: roll2d6(),
@@ -628,6 +871,7 @@ function createNewCharacter() {
 }
 
 createCharacterBtn.addEventListener("click", createNewCharacter);
+renderSaveSlots();
 
 for (const [abilityScoreName, element] of Object.entries(abilityScoreElements)) {
   element.addEventListener("click", () => performSavingThrow(abilityScoreName));
