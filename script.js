@@ -21,6 +21,9 @@ const startingHpElement = document.getElementById("starting-hp");
 const startingArmorElement = document.getElementById("starting-armor");
 const startingMovesList = document.getElementById("starting-moves-list");
 const startingStatsMissingElement = document.getElementById("starting-stats-missing");
+const startBattleBtn = document.getElementById("start-battle-btn");
+const endBattleBtn = document.getElementById("end-battle-btn");
+const restBtn = document.getElementById("rest-btn");
 const pokemonArtElement = document.getElementById("pokemon-art");
 const savingThrowResultElement = document.getElementById("saving-throw-result");
 const saveSlotsList = document.getElementById("save-slots-list");
@@ -126,6 +129,7 @@ function renderSavedCharacter(slotData) {
   const typesList = slotData.types || [];
   const startData = pokemonStartingData[slotData.pokemon];
   consumedMoveNames.clear();
+  resetDailyMoveUses();
   startingMovesList.innerHTML = "";
 
   for (const move of startData ? startData.baseMoves : []) {
@@ -516,7 +520,17 @@ let currentAbilityScores = null;
 let currentPokemonHp = null;
 let currentPokemonMaxHp = null;
 let consumedMoveNames = new Set();
+
+// Usage counters for limited daily moves (reset after rest)
 let cutUsesUsedToday = 0;
+let surfUsesUsedToday = 0;
+
+// Usage counters for limited per-battle moves (reset when battle starts/ends or after rest)
+let bubbleUsesUsedThisBattle = 0;
+let psywaveUsesUsedThisBattle = 0;
+let counterUsesUsedThisBattle = 0;
+let bubblebeamUsesUsedThisBattle = 0;
+let thunderboltUsesUsedThisBattle = 0;
 
 // Rolls a single six-sided die (1-6).
 function rollDie() {
@@ -560,6 +574,26 @@ function getPokedollarBonus(pokemonStartData, pokedollars) {
     ({ min, max }) => pokedollars >= min && pokedollars <= max
   );
   return match || null;
+}
+
+// Determines if a move name corresponds to a consumable item.
+function isConsumableItem(moveName) {
+  const knownConsumables = [
+    "Potion", "Super Potion", "Antidote", "Awakening", 
+    "Paralyze Heal", "Burn Heal", "Repel", "X Defend", "X Attack"
+  ];
+  if (knownConsumables.includes(moveName)) {
+    return true;
+  }
+
+  for (const pokemon of Object.values(pokemonStartingData)) {
+    for (const bonus of pokemon.pokedollarBonus || []) {
+      if (bonus.name === moveName && bonus.consumable) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 // Buckets a raw 2-12 ability score into the range keys used by pokemonTable.
@@ -628,6 +662,7 @@ function displayStartingStats(pokemon) {
   startingArmorElement.textContent = startData.armor ?? 0;
 
   consumedMoveNames.clear();
+  resetDailyMoveUses();
   startingMovesList.innerHTML = "";
   for (const move of startData.baseMoves) {
     const listItem = document.createElement("li");
@@ -672,15 +707,28 @@ function displayStartingStats(pokemon) {
   startingStatsDiv.hidden = false;
 }
 
-// Uses a basic move.
-// Absorb deals a 1d4 hit and restores the same amount of HP, capped at the
-// user's maximum HP. Tackle is a fixed 4-damage Normal-type move. Potion is a
-// one-time consumable that heals 2d4 HP without a type.
-function useMove(moveName) {
+// Executes a Pokémon move or consumable item action. Handles target selection
+// (Self/Other) for consumable items, enforces daily & battle usage limits,
+// updates HP/status accordingly, and renders the result to the log.
+function useMove(moveName, targetChoice = null) {
   const moveButtons = startingMovesList.querySelectorAll("button");
   const matchingButton = [...moveButtons].find((button) => button.textContent.startsWith(moveName));
 
   if (matchingButton && matchingButton.disabled) {
+    return;
+  }
+
+  if (isConsumableItem(moveName) && !targetChoice) {
+    savingThrowResultElement.innerHTML = `
+      <p>Target for <strong>${moveName.toUpperCase()}</strong>:</p>
+      <div class="target-choices">
+        <button type="button" class="target-choice-btn" id="target-choice-self">Self</button>
+        <button type="button" class="target-choice-btn" id="target-choice-other">Other</button>
+      </div>
+    `;
+
+    document.getElementById("target-choice-self").addEventListener("click", () => useMove(moveName, "self"));
+    document.getElementById("target-choice-other").addEventListener("click", () => useMove(moveName, "other"));
     return;
   }
 
@@ -701,17 +749,42 @@ function useMove(moveName) {
   }
 
   if (moveName === "Potion") {
-    const healAmount = Math.min(rollDice(2, 4), currentPokemonMaxHp - currentPokemonHp);
-    currentPokemonHp = Math.min(currentPokemonMaxHp, currentPokemonHp + healAmount);
-    startingHpElement.textContent = `${currentPokemonHp}/${currentPokemonMaxHp}`;
-
     consumedMoveNames.add(moveName);
     if (matchingButton) {
       matchingButton.disabled = true;
       matchingButton.classList.add("starting-move-button-used");
     }
 
-    savingThrowResultElement.innerHTML = `You use <strong>${moveName.toUpperCase()}</strong>. It heals ${healAmount} HP.`;
+    const rawHeal = rollDice(2, 4);
+    const targetLabel = targetChoice === "other" ? "another Pokémon" : "yourself";
+    if (targetChoice === "other") {
+      savingThrowResultElement.innerHTML = `You use <strong>${moveName.toUpperCase()}</strong> on <strong>${targetLabel}</strong>. It heals ${rawHeal} HP.`;
+    } else {
+      const healAmount = Math.min(rawHeal, currentPokemonMaxHp - currentPokemonHp);
+      currentPokemonHp = Math.min(currentPokemonMaxHp, currentPokemonHp + healAmount);
+      startingHpElement.textContent = `${currentPokemonHp}/${currentPokemonMaxHp}`;
+      savingThrowResultElement.innerHTML = `You use <strong>${moveName.toUpperCase()}</strong> on <strong>${targetLabel}</strong>. It heals ${healAmount} HP.`;
+    }
+    return;
+  }
+
+  if (moveName === "Super Potion") {
+    consumedMoveNames.add(moveName);
+    if (matchingButton) {
+      matchingButton.disabled = true;
+      matchingButton.classList.add("starting-move-button-used");
+    }
+
+    const rawHeal = rollDice(2, 8);
+    const targetLabel = targetChoice === "other" ? "another Pokémon" : "yourself";
+    if (targetChoice === "other") {
+      savingThrowResultElement.innerHTML = `You use <strong>${moveName.toUpperCase()}</strong> on <strong>${targetLabel}</strong>. It heals ${rawHeal} HP.`;
+    } else {
+      const healAmount = Math.min(rawHeal, currentPokemonMaxHp - currentPokemonHp);
+      currentPokemonHp = Math.min(currentPokemonMaxHp, currentPokemonHp + healAmount);
+      startingHpElement.textContent = `${currentPokemonHp}/${currentPokemonMaxHp}`;
+      savingThrowResultElement.innerHTML = `You use <strong>${moveName.toUpperCase()}</strong> on <strong>${targetLabel}</strong>. It heals ${healAmount} HP.`;
+    }
     return;
   }
 
@@ -722,7 +795,48 @@ function useMove(moveName) {
       matchingButton.classList.add("starting-move-button-used");
     }
 
-    savingThrowResultElement.innerHTML = `You use <strong>${moveName.toUpperCase()}</strong>. You have cleared your <strong>POISON</strong> status.`;
+    const targetLabel = targetChoice === "other" ? "another Pokémon" : "yourself";
+    const detail = targetChoice === "other" ? "Target's <strong>POISON</strong> status has been cleared." : "You have cleared your <strong>POISON</strong> status.";
+    savingThrowResultElement.innerHTML = `You use <strong>${moveName.toUpperCase()}</strong> on <strong>${targetLabel}</strong>. ${detail}`;
+    return;
+  }
+
+  if (moveName === "Awakening") {
+    consumedMoveNames.add(moveName);
+    if (matchingButton) {
+      matchingButton.disabled = true;
+      matchingButton.classList.add("starting-move-button-used");
+    }
+
+    const targetLabel = targetChoice === "other" ? "another Pokémon" : "yourself";
+    const detail = targetChoice === "other" ? "Target is cured from <strong>SLEEP</strong> status." : "You are cured from <strong>SLEEP</strong> status.";
+    savingThrowResultElement.innerHTML = `You use <strong>${moveName.toUpperCase()}</strong> on <strong>${targetLabel}</strong>. ${detail}`;
+    return;
+  }
+
+  if (moveName === "Paralyze Heal") {
+    consumedMoveNames.add(moveName);
+    if (matchingButton) {
+      matchingButton.disabled = true;
+      matchingButton.classList.add("starting-move-button-used");
+    }
+
+    const targetLabel = targetChoice === "other" ? "another Pokémon" : "yourself";
+    const detail = targetChoice === "other" ? "Target's <strong>PARALYZE</strong> status has been cured." : "You have cured your <strong>PARALYZE</strong> status.";
+    savingThrowResultElement.innerHTML = `You use <strong>${moveName.toUpperCase()}</strong> on <strong>${targetLabel}</strong>. ${detail}`;
+    return;
+  }
+
+  if (moveName === "X Defend") {
+    consumedMoveNames.add(moveName);
+    if (matchingButton) {
+      matchingButton.disabled = true;
+      matchingButton.classList.add("starting-move-button-used");
+    }
+
+    const targetLabel = targetChoice === "other" ? "another Pokémon" : "yourself";
+    const detail = targetChoice === "other" ? "Increases Armor for the target's next incoming attack." : "Increases Armor for your next incoming attack.";
+    savingThrowResultElement.innerHTML = `You use <strong>${moveName.toUpperCase()}</strong> on <strong>${targetLabel}</strong>. ${detail}`;
     return;
   }
 
@@ -733,7 +847,8 @@ function useMove(moveName) {
       matchingButton.classList.add("starting-move-button-used");
     }
 
-    savingThrowResultElement.innerHTML = `You use <strong>${moveName.toUpperCase()}</strong>. Enemy Pokémon have disadvantage on morale saves for one day.`;
+    const targetLabel = targetChoice === "other" ? "another Pokémon" : "yourself";
+    savingThrowResultElement.innerHTML = `You use <strong>${moveName.toUpperCase()}</strong> on <strong>${targetLabel}</strong>. Enemy Pokémon have disadvantage on morale saves for one day.`;
     return;
   }
 
@@ -749,16 +864,100 @@ function useMove(moveName) {
     return;
   }
 
+  if (moveName === "Dig") {
+    const damageDealt = rollDice(1, 10);
+    savingThrowResultElement.innerHTML = `You use <strong>${moveName.toUpperCase()}</strong>. <span class="type-tag pokemon-type-ground">Ground</span> type move. You dig underground, evading the next attack. On your next turn, you emerge and deal ${damageDealt} HP damage to the target. Can also dig a path to a lower level of the dungeon.`;
+    return;
+  }
+
   if (moveName === "Cut") {
     if (cutUsesUsedToday >= 3) {
-      savingThrowResultElement.innerHTML = `You have already used <strong>${moveName.toUpperCase()}</strong> 3 times today. It resets after rest.`;
+      savingThrowResultElement.innerHTML = `You have already used <strong>${moveName.toUpperCase()}</strong> 3 times today. It resets after a rest.`;
       return;
     }
 
     const damageDealt = rollDice(1, 6);
     cutUsesUsedToday += 1;
     const remainingUses = 3 - cutUsesUsedToday;
-    savingThrowResultElement.innerHTML = `You use <strong>${moveName.toUpperCase()}</strong>. <span class="type-tag pokemon-type-normal">Normal</span> type move. You deal ${damageDealt} HP to the target. ${remainingUses} use${remainingUses === 1 ? "" : "s"} remaining today.`;
+    savingThrowResultElement.innerHTML = `You use <strong>${moveName.toUpperCase()}</strong>. <span class="type-tag pokemon-type-normal">Normal</span> type move. You deal ${damageDealt} damage to the target. Can also cut a path in the forest by clearing foliage. ${remainingUses} use${remainingUses === 1 ? "" : "s"} remaining today.`;
+    return;
+  }
+
+  if (moveName === "Bubble") {
+    if (bubbleUsesUsedThisBattle >= 3) {
+      savingThrowResultElement.innerHTML = `You have already used <strong>${moveName.toUpperCase()}</strong> 3 times this battle. It resets after battle ends.`;
+      return;
+    }
+
+    const damageDealt = rollDice(1, 4);
+    bubbleUsesUsedThisBattle += 1;
+    const remainingUses = 3 - bubbleUsesUsedThisBattle;
+    savingThrowResultElement.innerHTML = `You use <strong>${moveName.toUpperCase()}</strong>. <span class="type-tag pokemon-type-water">Water</span> type move. You deal ${damageDealt} blast damage. Target has disadvantage on Dexterity saves until they pass a Dexterity save. ${remainingUses} use${remainingUses === 1 ? "" : "s"} remaining this battle.`;
+    return;
+  }
+
+  if (moveName === "Bubblebeam") {
+    if (bubblebeamUsesUsedThisBattle >= 2) {
+      savingThrowResultElement.innerHTML = `You have already used <strong>${moveName.toUpperCase()}</strong> 2 times this battle. It resets after battle ends.`;
+      return;
+    }
+
+    const damageDealt = rollDice(1, 8);
+    bubblebeamUsesUsedThisBattle += 1;
+    const remainingUses = 2 - bubblebeamUsesUsedThisBattle;
+    savingThrowResultElement.innerHTML = `You use <strong>${moveName.toUpperCase()}</strong>. <span class="type-tag pokemon-type-water">Water</span> type move. You deal ${damageDealt} damage to target. ${remainingUses} use${remainingUses === 1 ? "" : "s"} remaining this battle.`;
+    return;
+  }
+
+  if (moveName === "Psywave") {
+    if (psywaveUsesUsedThisBattle >= 2) {
+      savingThrowResultElement.innerHTML = `You have already used <strong>${moveName.toUpperCase()}</strong> 2 times this battle. It resets after battle ends.`;
+      return;
+    }
+
+    const damageDealt = rollDice(1, 6);
+    psywaveUsesUsedThisBattle += 1;
+    const remainingUses = 2 - psywaveUsesUsedThisBattle;
+    savingThrowResultElement.innerHTML = `You use <strong>${moveName.toUpperCase()}</strong>. <span class="type-tag pokemon-type-psychic">Psychic</span> type move. You deal ${damageDealt} damage to target. ${remainingUses} use${remainingUses === 1 ? "" : "s"} remaining this battle.`;
+    return;
+  }
+
+  if (moveName === "Counter") {
+    if (counterUsesUsedThisBattle >= 2) {
+      savingThrowResultElement.innerHTML = `You have already used <strong>${moveName.toUpperCase()}</strong> 2 times this battle. It resets after battle ends.`;
+      return;
+    }
+
+    counterUsesUsedThisBattle += 1;
+    const remainingUses = 2 - counterUsesUsedThisBattle;
+    savingThrowResultElement.innerHTML = `You use <strong>${moveName.toUpperCase()}</strong>. <span class="type-tag pokemon-type-fighting">Fighting</span> type move. User moves last in battle. If attacked with a Normal or Fighting type move this turn, you deal 2x damage back to the attacker. ${remainingUses} use${remainingUses === 1 ? "" : "s"} remaining this battle.`;
+    return;
+  }
+
+  if (moveName === "Thunderbolt") {
+    if (thunderboltUsesUsedThisBattle >= 1) {
+      savingThrowResultElement.innerHTML = `You have already used <strong>${moveName.toUpperCase()}</strong> 1 time this battle. It resets after battle ends.`;
+      return;
+    }
+
+    const damageDealt = rollDice(1, 10);
+    thunderboltUsesUsedThisBattle += 1;
+    const remainingUses = 1 - thunderboltUsesUsedThisBattle;
+    savingThrowResultElement.innerHTML = `You use <strong>${moveName.toUpperCase()}</strong>. <span class="type-tag pokemon-type-electric">Electric</span> type move. You deal ${damageDealt} damage to target. ${remainingUses} use remaining this battle.`;
+    return;
+  }
+
+  if (moveName === "Surf") {
+    if (surfUsesUsedToday >= 1) {
+      savingThrowResultElement.innerHTML = `You have already used <strong>${moveName.toUpperCase()}</strong> 1 time today. It resets after a rest.`;
+      return;
+    }
+
+    const damageDealt = rollDice(1, 10);
+    const transportHours = rollDice(1, 6);
+    surfUsesUsedToday += 1;
+    const remainingUses = 1 - surfUsesUsedToday;
+    savingThrowResultElement.innerHTML = `You use <strong>${moveName.toUpperCase()}</strong>. <span class="type-tag pokemon-type-water">Water</span> type move. You deal ${damageDealt} blast damage. This move can also transport up to 6 Pokémon across a large body of water in ${transportHours} hour${transportHours === 1 ? "" : "s"}. ${remainingUses} use remaining today.`;
     return;
   }
 
@@ -877,8 +1076,42 @@ function promptForReroll() {
 // Entry point for the "Create Character" button: rolls fresh ability
 // scores and starting Pokedollars, resets prior selections/UI state, and
 // kicks off the reroll prompt.
+// Resets all move counters that are limited to a certain number of uses per battle.
+function resetBattleMoveUses() {
+  bubbleUsesUsedThisBattle = 0;
+  psywaveUsesUsedThisBattle = 0;
+  counterUsesUsedThisBattle = 0;
+  bubblebeamUsesUsedThisBattle = 0;
+  thunderboltUsesUsedThisBattle = 0;
+}
+
+// Resets all move counters limited per day (and also resets per-battle moves).
 function resetDailyMoveUses() {
   cutUsesUsedToday = 0;
+  surfUsesUsedToday = 0;
+  resetBattleMoveUses();
+}
+
+// Starts a new battle: resets all per-battle move counters and updates the log.
+function startBattle() {
+  resetBattleMoveUses();
+  savingThrowResultElement.innerHTML = "<strong>Battle started!</strong> Move uses per battle have been reset.";
+}
+
+// Ends the current battle: resets per-battle move counters and updates the log.
+function endBattle() {
+  resetBattleMoveUses();
+  savingThrowResultElement.innerHTML = "<strong>Battle ended!</strong> Move uses per battle have been reset.";
+}
+
+// Rests the character: restores HP to maximum and resets all daily and battle move limits.
+function rest() {
+  resetDailyMoveUses();
+  if (currentPokemonMaxHp !== null) {
+    currentPokemonHp = currentPokemonMaxHp;
+    startingHpElement.textContent = `${currentPokemonHp}/${currentPokemonMaxHp}`;
+  }
+  savingThrowResultElement.innerHTML = "<strong>Rested!</strong> Hit points and all expired move uses (daily & battle) have been reset.";
 }
 
 function createNewCharacter() {
@@ -916,6 +1149,15 @@ function createNewCharacter() {
 }
 
 createCharacterBtn.addEventListener("click", createNewCharacter);
+if (startBattleBtn) {
+  startBattleBtn.addEventListener("click", startBattle);
+}
+if (endBattleBtn) {
+  endBattleBtn.addEventListener("click", endBattle);
+}
+if (restBtn) {
+  restBtn.addEventListener("click", rest);
+}
 renderSaveSlots();
 
 for (const [abilityScoreName, element] of Object.entries(abilityScoreElements)) {
