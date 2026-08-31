@@ -199,12 +199,38 @@ function loadSavedCharacter(slotIndex) {
   renderSaveSlots();
 }
 
+function clearSingleSaveSlot(slotIndex) {
+  const slot = saveSlots[slotIndex];
+  if (!slot) {
+    return;
+  }
+
+  const confirmClear = window.confirm(`Remove ${slot.pokemon} from bench slot ${slotIndex + 1}?`);
+  if (!confirmClear) {
+    return;
+  }
+
+  saveSlots[slotIndex] = null;
+  persistSaveSlots();
+}
+
 function renderSaveSlots() {
   saveSlotsList.innerHTML = "";
 
   saveSlots.forEach((slot, index) => {
     const card = document.createElement("div");
     card.className = "save-slot-card";
+
+    if (slot) {
+      const removeButton = document.createElement("button");
+      removeButton.type = "button";
+      removeButton.className = "save-slot-remove";
+      removeButton.title = `Remove ${slot.pokemon}`;
+      removeButton.textContent = "×";
+      removeButton.setAttribute("aria-label", `Remove ${slot.pokemon} from slot ${index + 1}`);
+      removeButton.addEventListener("click", () => clearSingleSaveSlot(index));
+      card.appendChild(removeButton);
+    }
 
     const header = document.createElement("div");
     header.className = "save-slot-header";
@@ -490,6 +516,7 @@ let currentAbilityScores = null;
 let currentPokemonHp = null;
 let currentPokemonMaxHp = null;
 let consumedMoveNames = new Set();
+let cutUsesUsedToday = 0;
 
 // Rolls a single six-sided die (1-6).
 function rollDie() {
@@ -722,6 +749,19 @@ function useMove(moveName) {
     return;
   }
 
+  if (moveName === "Cut") {
+    if (cutUsesUsedToday >= 3) {
+      savingThrowResultElement.innerHTML = `You have already used <strong>${moveName.toUpperCase()}</strong> 3 times today. It resets after rest.`;
+      return;
+    }
+
+    const damageDealt = rollDice(1, 6);
+    cutUsesUsedToday += 1;
+    const remainingUses = 3 - cutUsesUsedToday;
+    savingThrowResultElement.innerHTML = `You use <strong>${moveName.toUpperCase()}</strong>. <span class="type-tag pokemon-type-normal">Normal</span> type move. You deal ${damageDealt} HP to the target. ${remainingUses} use${remainingUses === 1 ? "" : "s"} remaining today.`;
+    return;
+  }
+
   savingThrowResultElement.innerHTML = `You use <strong>${moveName.toUpperCase()}</strong>.`;
 }
 
@@ -837,8 +877,13 @@ function promptForReroll() {
 // Entry point for the "Create Character" button: rolls fresh ability
 // scores and starting Pokedollars, resets prior selections/UI state, and
 // kicks off the reroll prompt.
+function resetDailyMoveUses() {
+  cutUsesUsedToday = 0;
+}
+
 function createNewCharacter() {
   selectedMainAbility = null;
+  resetDailyMoveUses();
   currentAbilityScores = {
     strength: roll2d6(),
     dexterity: roll2d6(),

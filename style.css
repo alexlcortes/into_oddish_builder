@@ -34,7 +34,7 @@ body {
 }
 
 .save-slots-panel h2 {
-  margin-bottom: 12px;
+  margin: 0 0 12px;
 }
 
 .save-slots-list {
@@ -44,10 +44,26 @@ body {
 }
 
 .save-slot-card {
+  position: relative;
   border: 2px solid #1a1a1a;
   border-radius: 10px;
   padding: 10px;
   background: #fafafa;
+}
+
+.save-slot-remove {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  border: 1px solid #1a1a1a;
+  border-radius: 50%;
+  background: #fff;
+  color: #1a1a1a;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
 }
 
 .save-slot-header {
