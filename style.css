@@ -260,22 +260,17 @@ body {
   margin-top: 6px;
 }
 
-#starting-moves-list li {
-  border: 2px solid black;
+.starting-move-button {
+  background-color: #555;
+  color: white;
+  border: none;
   border-radius: 6px;
   padding: 4px 10px;
-}
-
-.starting-move-button {
-  background: transparent;
-  border: none;
-  padding: 0;
   font: inherit;
   cursor: pointer;
 }
 
 .starting-move-button-used {
-  color: #888;
   cursor: not-allowed;
   opacity: 0.55;
 }

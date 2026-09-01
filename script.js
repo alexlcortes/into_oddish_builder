@@ -138,6 +138,10 @@ function renderSavedCharacter(slotData) {
     moveButton.type = "button";
     moveButton.textContent = move;
     moveButton.classList.add("starting-move-button");
+    const baseMoveTypeClass = getMoveTypeClass(move);
+    if (baseMoveTypeClass) {
+      moveButton.classList.add(baseMoveTypeClass);
+    }
     moveButton.addEventListener("click", () => useMove(move));
     listItem.appendChild(moveButton);
     startingMovesList.appendChild(listItem);
@@ -149,6 +153,10 @@ function renderSavedCharacter(slotData) {
     moveButton.type = "button";
     moveButton.textContent = slotData.bonusMoveType === "item" ? `${slotData.bonusMove} (Consumable Item)` : slotData.bonusMove;
     moveButton.classList.add("starting-move-button");
+    const bonusMoveTypeClass = getMoveTypeClass(slotData.bonusMove);
+    if (bonusMoveTypeClass) {
+      moveButton.classList.add(bonusMoveTypeClass);
+    }
     moveButton.addEventListener("click", () => useMove(slotData.bonusMove));
     listItem.appendChild(moveButton);
     startingMovesList.appendChild(listItem);
@@ -521,9 +529,51 @@ let currentPokemonHp = null;
 let currentPokemonMaxHp = null;
 let consumedMoveNames = new Set();
 
+// Maps each move with a confirmed type to its lowercase type name, used to
+// color starting-move buttons via the existing `pokemon-type-*` CSS classes.
+// Moves not listed here (e.g. unfinished bonus moves, consumable items) fall
+// back to the default button styling.
+const moveTypes = {
+  Bubble: "water",
+  Tackle: "normal",
+  "Karate Chop": "normal",
+  "Tail Whip": "normal",
+  Wrap: "normal",
+  Leer: "normal",
+  "Poison Sting": "poison",
+  "String Shot": "bug",
+  Gust: "normal",
+  "Sand-Attack": "ground",
+  Scratch: "normal",
+  Growl: "normal",
+  Teleport: "psychic",
+  Absorb: "grass",
+  Lick: "ghost",
+  "Confuse Ray": "ghost",
+  Psywave: "psychic",
+  Surf: "water",
+  Dig: "ground",
+  Strength: "normal",
+  Counter: "fighting",
+  Bubblebeam: "water",
+  Thunderbolt: "electric",
+  Cut: "normal",
+};
+
+// Returns the `pokemon-type-*` CSS class for a move's type, or null if the
+// move has no confirmed type yet.
+function getMoveTypeClass(moveName) {
+  const type = moveTypes[moveName];
+  return type ? `pokemon-type-${type}` : null;
+}
+
 // Usage counters for limited daily moves (reset after rest)
 let cutUsesUsedToday = 0;
 let surfUsesUsedToday = 0;
+let tailWhipUsesUsedToday = 0;
+let teleportUsesUsedToday = 0;
+let confuseRayUsesUsedToday = 0;
+let strengthUsesUsedToday = 0;
 
 // Usage counters for limited per-battle moves (reset when battle starts/ends or after rest)
 let bubbleUsesUsedThisBattle = 0;
@@ -531,6 +581,11 @@ let psywaveUsesUsedThisBattle = 0;
 let counterUsesUsedThisBattle = 0;
 let bubblebeamUsesUsedThisBattle = 0;
 let thunderboltUsesUsedThisBattle = 0;
+let karateChopUsesUsedThisBattle = 0;
+let wrapUsesUsedThisBattle = 0;
+let lickUsesUsedThisBattle = 0;
+let leerUsesUsedThisBattle = 0;
+let sandAttackUsesUsedThisBattle = 0;
 
 // Rolls a single six-sided die (1-6).
 function rollDie() {
@@ -670,6 +725,10 @@ function displayStartingStats(pokemon) {
     moveButton.type = "button";
     moveButton.textContent = move;
     moveButton.classList.add("starting-move-button");
+    const baseMoveTypeClass = getMoveTypeClass(move);
+    if (baseMoveTypeClass) {
+      moveButton.classList.add(baseMoveTypeClass);
+    }
     moveButton.addEventListener("click", () => useMove(move));
     listItem.appendChild(moveButton);
     startingMovesList.appendChild(listItem);
@@ -681,6 +740,10 @@ function displayStartingStats(pokemon) {
     moveButton.type = "button";
     moveButton.textContent = bonus.consumable ? `${bonus.name} (Consumable Item)` : bonus.name;
     moveButton.classList.add("starting-move-button");
+    const bonusMoveTypeClass = getMoveTypeClass(bonus.name);
+    if (bonusMoveTypeClass) {
+      moveButton.classList.add(bonusMoveTypeClass);
+    }
     if (bonus.consumable && consumedMoveNames.has(bonus.name)) {
       moveButton.disabled = true;
       moveButton.classList.add("starting-move-button-used");
@@ -742,9 +805,148 @@ function useMove(moveName, targetChoice = null) {
     return;
   }
 
+  if (moveName === "Poison Sting") {
+    const damageDealt = rollDice(1, 4);
+    savingThrowResultElement.innerHTML = `You use <strong>${moveName.toUpperCase()}</strong>. <span class="type-tag pokemon-type-poison">Poison</span> type move. You deal ${damageDealt} damage to the target. This move can be used an unlimited number of times.`;
+    return;
+  }
+
   if (moveName === "Tackle") {
     const damageDealt = 4;
     savingThrowResultElement.innerHTML = `You use <strong>${moveName.toUpperCase()}</strong>. <span class="type-tag pokemon-type-normal">Normal</span> type move. You deal ${damageDealt} HP.`;
+    return;
+  }
+
+  if (moveName === "Karate Chop") {
+    if (karateChopUsesUsedThisBattle >= 2) {
+      savingThrowResultElement.innerHTML = `You have already used <strong>${moveName.toUpperCase()}</strong> 2 times this battle. It resets after battle ends.`;
+      return;
+    }
+
+    const roll = rollDice(1, 6);
+    const isCritical = roll >= 5;
+    const damageDealt = isCritical ? roll + rollDice(1, 6) : roll;
+    karateChopUsesUsedThisBattle += 1;
+    const remainingUses = 2 - karateChopUsesUsedThisBattle;
+    savingThrowResultElement.innerHTML = `You use <strong>${moveName.toUpperCase()}</strong>. <span class="type-tag pokemon-type-normal">Normal</span> type move. You deal ${damageDealt} damage to the target${isCritical ? " (critical hit!)" : ""}. ${remainingUses} use${remainingUses === 1 ? "" : "s"} remaining this battle.`;
+    return;
+  }
+
+  if (moveName === "Tail Whip") {
+    if (tailWhipUsesUsedToday >= 3) {
+      savingThrowResultElement.innerHTML = `You have already used <strong>${moveName.toUpperCase()}</strong> 3 times today. It resets after a rest.`;
+      return;
+    }
+
+    tailWhipUsesUsedToday += 1;
+    const remainingUses = 3 - tailWhipUsesUsedToday;
+    savingThrowResultElement.innerHTML = `You use <strong>${moveName.toUpperCase()}</strong>. <span class="type-tag pokemon-type-normal">Normal</span> type move. Target's Armor is reduced by 1 for the rest of the battle. ${remainingUses} use${remainingUses === 1 ? "" : "s"} remaining today.`;
+    return;
+  }
+
+  if (moveName === "Wrap") {
+    if (wrapUsesUsedThisBattle >= 2) {
+      savingThrowResultElement.innerHTML = `You have already used <strong>${moveName.toUpperCase()}</strong> 2 times this battle. It resets after battle ends.`;
+      return;
+    }
+
+    const turnsBound = rollDice(1, 4);
+    const damageDealt = rollDice(1, 4);
+    wrapUsesUsedThisBattle += 1;
+    const remainingUses = 2 - wrapUsesUsedThisBattle;
+    savingThrowResultElement.innerHTML = `You use <strong>${moveName.toUpperCase()}</strong>. <span class="type-tag pokemon-type-normal">Normal</span> type move. You must spend the next ${turnsBound} turn${turnsBound === 1 ? "" : "s"} attacking the same target, unless it faints. Target takes ${damageDealt} damage this turn and is immobilized. ${remainingUses} use${remainingUses === 1 ? "" : "s"} remaining this battle.`;
+    return;
+  }
+
+  if (moveName === "Teleport") {
+    if (teleportUsesUsedToday >= 2) {
+      savingThrowResultElement.innerHTML = `You have already used <strong>${moveName.toUpperCase()}</strong> 2 times today. It resets after a rest.`;
+      return;
+    }
+
+    teleportUsesUsedToday += 1;
+    const remainingUses = 2 - teleportUsesUsedToday;
+    savingThrowResultElement.innerHTML = `You use <strong>${moveName.toUpperCase()}</strong>. <span class="type-tag pokemon-type-psychic">Psychic</span> type move. You and up to six other Pokémon are teleported to the last Pokémon Center you visited. ${remainingUses} use${remainingUses === 1 ? "" : "s"} remaining today.`;
+    return;
+  }
+
+  if (moveName === "String Shot") {
+    const roll = roll1d20();
+    const success = roll >= 2;
+    const detail = success
+      ? "Target has disadvantage on all Dexterity saves until they pass a Dexterity save."
+      : "The target resists the effect.";
+    savingThrowResultElement.innerHTML = `You use <strong>${moveName.toUpperCase()}</strong>. <span class="type-tag pokemon-type-bug">Bug</span> type move. You roll a (${roll}) on 1d20. ${detail} This move can be used an unlimited number of times.`;
+    return;
+  }
+
+  if (moveName === "Scratch") {
+    const damageDealt = rollDice(1, 4);
+    savingThrowResultElement.innerHTML = `You use <strong>${moveName.toUpperCase()}</strong>. <span class="type-tag pokemon-type-normal">Normal</span> type move. You deal ${damageDealt} damage to the target. This move can be used an unlimited number of times.`;
+    return;
+  }
+
+  if (moveName === "Lick") {
+    if (lickUsesUsedThisBattle >= 3) {
+      savingThrowResultElement.innerHTML = `You have already used <strong>${moveName.toUpperCase()}</strong> 3 times this battle. It resets after battle ends.`;
+      return;
+    }
+
+    const roll = rollDice(1, 4);
+    const isCritical = roll === 4;
+    const damageDealt = isCritical ? roll + rollDice(1, 4) : roll;
+    lickUsesUsedThisBattle += 1;
+    const remainingUses = 3 - lickUsesUsedThisBattle;
+    const criticalDetail = isCritical ? ` Critical hit! Target suffers the <strong>PARALYZE</strong> status.` : "";
+    savingThrowResultElement.innerHTML = `You use <strong>${moveName.toUpperCase()}</strong>. <span class="type-tag pokemon-type-ghost">Ghost</span> type move. You deal ${damageDealt} damage to the target.${criticalDetail} Psychic-type Pokémon are immune to this attack. ${remainingUses} use${remainingUses === 1 ? "" : "s"} remaining this battle.`;
+    return;
+  }
+
+  if (moveName === "Leer") {
+    if (leerUsesUsedThisBattle >= 3) {
+      savingThrowResultElement.innerHTML = `You have already used <strong>${moveName.toUpperCase()}</strong> 3 times this battle. It resets after battle ends.`;
+      return;
+    }
+
+    leerUsesUsedThisBattle += 1;
+    const remainingUses = 3 - leerUsesUsedThisBattle;
+    savingThrowResultElement.innerHTML = `You use <strong>${moveName.toUpperCase()}</strong>. <span class="type-tag pokemon-type-normal">Normal</span> type move. Target's Armor is reduced by 1 for the remainder of the battle. ${remainingUses} use${remainingUses === 1 ? "" : "s"} remaining this battle.`;
+    return;
+  }
+
+  if (moveName === "Gust") {
+    const damageDealt = rollDice(1, 4);
+    savingThrowResultElement.innerHTML = `You use <strong>${moveName.toUpperCase()}</strong>. <span class="type-tag pokemon-type-normal">Normal</span> type move. You deal ${damageDealt} damage to the target. This move can be used an unlimited number of times.`;
+    return;
+  }
+
+  if (moveName === "Growl") {
+    savingThrowResultElement.innerHTML = `You use <strong>${moveName.toUpperCase()}</strong>. <span class="type-tag pokemon-type-normal">Normal</span> type move. Target's attacks are impaired for the remainder of the battle. This move can be used an unlimited number of times.`;
+    return;
+  }
+
+  if (moveName === "Confuse Ray") {
+    if (confuseRayUsesUsedToday >= 1) {
+      savingThrowResultElement.innerHTML = `You have already used <strong>${moveName.toUpperCase()}</strong> 1 time today. It resets after a rest.`;
+      return;
+    }
+
+    const confusionTurns = rollDice(1, 4);
+    confuseRayUsesUsedToday += 1;
+    const remainingUses = 1 - confuseRayUsesUsedToday;
+    savingThrowResultElement.innerHTML = `You use <strong>${moveName.toUpperCase()}</strong>. <span class="type-tag pokemon-type-ghost">Ghost</span> type move. Target suffers the <strong>CONFUSION</strong> status for ${confusionTurns} turn${confusionTurns === 1 ? "" : "s"}. While confused, the target must make a Willpower save each turn or take 1d6 damage injuring themselves. ${remainingUses} use remaining today.`;
+    return;
+  }
+
+  if (moveName === "Sand-Attack") {
+    if (sandAttackUsesUsedThisBattle >= 1) {
+      savingThrowResultElement.innerHTML = `You have already used <strong>${moveName.toUpperCase()}</strong> 1 time this battle. It resets after battle ends.`;
+      return;
+    }
+
+    sandAttackUsesUsedThisBattle += 1;
+    const remainingUses = 1 - sandAttackUsesUsedThisBattle;
+    savingThrowResultElement.innerHTML = `You use <strong>${moveName.toUpperCase()}</strong>. <span class="type-tag pokemon-type-ground">Ground</span> type move. Target's Accuracy is lowered by 1 stage for the remainder of the battle, dropping their damage die down one size (e.g. 1d6 becomes 1d4). ${remainingUses} use remaining this battle.`;
     return;
   }
 
@@ -853,14 +1055,15 @@ function useMove(moveName, targetChoice = null) {
   }
 
   if (moveName === "Strength") {
-    const damageDealt = rollDice(1, 8);
-    consumedMoveNames.add(moveName);
-    if (matchingButton) {
-      matchingButton.disabled = true;
-      matchingButton.classList.add("starting-move-button-used");
+    if (strengthUsesUsedToday >= 1) {
+      savingThrowResultElement.innerHTML = `You have already used <strong>${moveName.toUpperCase()}</strong> 1 time today. It resets after a rest.`;
+      return;
     }
 
-    savingThrowResultElement.innerHTML = `You use <strong>${moveName.toUpperCase()}</strong>. <span class="type-tag pokemon-type-normal">Normal</span> type move. You deal ${damageDealt} HP to the target. It can also move travel-blocking boulders.`;
+    const damageDealt = rollDice(1, 8);
+    strengthUsesUsedToday += 1;
+    const remainingUses = 1 - strengthUsesUsedToday;
+    savingThrowResultElement.innerHTML = `You use <strong>${moveName.toUpperCase()}</strong>. <span class="type-tag pokemon-type-normal">Normal</span> type move. You deal ${damageDealt} HP to the target. It can also move travel-blocking boulders. ${remainingUses} use remaining today.`;
     return;
   }
 
@@ -1083,12 +1286,21 @@ function resetBattleMoveUses() {
   counterUsesUsedThisBattle = 0;
   bubblebeamUsesUsedThisBattle = 0;
   thunderboltUsesUsedThisBattle = 0;
+  karateChopUsesUsedThisBattle = 0;
+  wrapUsesUsedThisBattle = 0;
+  lickUsesUsedThisBattle = 0;
+  leerUsesUsedThisBattle = 0;
+  sandAttackUsesUsedThisBattle = 0;
 }
 
 // Resets all move counters limited per day (and also resets per-battle moves).
 function resetDailyMoveUses() {
   cutUsesUsedToday = 0;
   surfUsesUsedToday = 0;
+  tailWhipUsesUsedToday = 0;
+  teleportUsesUsedToday = 0;
+  confuseRayUsesUsedToday = 0;
+  strengthUsesUsedToday = 0;
   resetBattleMoveUses();
 }
 
