@@ -42,13 +42,33 @@ A vanilla HTML/CSS/JavaScript web app for generating Pokemon character starter s
 ## File Structure
 
 - `index.html` - Main markup, character sheet layout, battle/rest buttons, and bench save slots UI
-- `script.js` - Character creation logic, move execution, item target prompts, usage limit tracking, state persistence, and Pokemon lookup tables
 - `style.css` - Styling for types, move buttons, battle controls, item target selection, and bench slots
 - `images/` - Image assets for Pokemon art (`nidoran-f.png`, `poliwag.png`, etc.)
+- `js/` - Character creation logic, move execution, item target prompts, usage limit tracking, state persistence, and Pokemon lookup tables, split by concern:
+  - `dom.js` - DOM element references
+  - `state.js` - Shared mutable game state (current character, HP, move-use counters)
+  - `data.js` - Static data tables (`pokemonTable`, `pokemonStartingData`, `moveTypes`, `abilityScoreLabels`)
+  - `dice.js` - Dice-rolling utilities
+  - `lookups.js` - Pure lookup helpers built on `data.js`
+  - `moves.js` - Move/item execution logic (`useMove`)
+  - `battle.js` - Battle/rest controls and move-use counter resets
+  - `bench.js` - Bench save-slot persistence (localStorage)
+  - `characterCreation.js` - Character creation flow and ability-score/main-attribute selection
+  - `main.js` - Entry point; wires up event listeners
+
+## Running Locally
+
+This app uses native ES modules (`import`/`export`), which browsers block from
+loading over the `file://` protocol. Serve the folder over HTTP instead of
+opening `index.html` directly:
+
+1. `npx serve .` (or `python3 -m http.server 8000`)
+2. Open the printed URL (e.g. `http://localhost:3000` or `http://localhost:8000`) in your browser
+3. Click "Create New Character" to begin!
 
 ## Customizing Pokemon
 
-The Pokemon table is defined in `script.js` as `pokemonTable`. It's organized by ability type and score range:
+The Pokemon table is defined in `js/data.js` as `pokemonTable`. It's organized by ability type and score range:
 
 ```javascript
 const pokemonTable = {
@@ -64,7 +84,3 @@ const pokemonTable = {
 ```
 
 Starter kits, base moves, and Pokedollar tier bonus options are configured under `pokemonStartingData`.
-
-## Getting Started
-
-Simply open `index.html` in a web browser and click "Create New Character" to begin!
